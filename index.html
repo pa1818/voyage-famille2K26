@@ -3,202 +3,182 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Index – Vote Familial (Destinations)</title>
-  <meta name="description" content="Site familial pour proposer des destinations et voter en 5 étoiles, avec classement en temps réel via Firebase Realtime Database." />
+  <title>Vote Familial – Destinations</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: linear-gradient(135deg, #f0f4ff, #dbeafe); color: #333; }
-    header { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; padding: 1.5rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    header h1 { margin: 0; font-size: 1.8rem; }
-    main { padding: 2rem 1rem; max-width: 950px; margin: auto; }
-    h2 { margin-top: 2.5rem; color: #007bff; border-bottom: 2px solid #e0e7ff; padding-bottom: 0.5rem; }
-    .card { background: #fff; padding: 1.2rem; margin-bottom: 1rem; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s ease; }
-    .card:hover { transform: translateY(-3px); }
-    .btn { padding: 0.6rem 1.2rem; margin: 0.3rem; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; transition: 0.2s ease; }
-    .primary { background: linear-gradient(90deg, #007bff, #00c6ff); color: #fff; }
-    .primary:hover { opacity: 0.9; }
-    .danger { background: #ef4444; color: #fff; }
-    .danger:hover { background: #dc2626; }
-    .star { font-size: 1.5rem; cursor: pointer; color: #ccc; transition: color 0.2s ease; }
-    .star:hover { color: #fbbf24; }
-    .star.selected { color: #f59e0b; }
-    input, textarea { width: 100%; padding: 0.7rem; margin: 0.5rem 0; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 1rem; }
-    textarea { resize: vertical; }
-    #ranking .card { display: flex; justify-content: space-between; align-items: center; font-size: 1rem; }
-    footer { text-align: center; padding: 1rem; font-size: 0.9rem; color: #6b7280; margin-top: 2rem; }
+    /* Design épuré et futuriste */
+    :root {
+      --bg: #0b1020;
+      --card: #121933;
+      --muted: #8ea0ff;
+      --accent: #6ea8ff;
+      --text: #e8ecff;
+      --danger: #ff6b6b;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    body { margin:0; font-family: Segoe UI, Inter, sans-serif; background: var(--bg); color: var(--text); }
+    header { background: rgba(18,25,51,.8); backdrop-filter: blur(6px); padding:1rem; position:sticky; top:0; z-index:10; }
+    nav { display:flex; gap:.5rem; justify-content:center; }
+    .tab { padding:.5rem 1rem; border-radius: 999px; border:1px solid rgba(255,255,255,.15); color: var(--muted); text-decoration:none; }
+    .tab.active { background: linear-gradient(135deg, #3f64ff, #6aa6ff); color:#04122e; border-color:transparent; }
+    main { max-width:950px; margin: auto; padding: 1.5rem; }
+    .card { background: var(--card); border:1px solid rgba(255,255,255,.08); border-radius: var(--radius); box-shadow: var(--shadow); padding:1rem; margin-bottom:1rem; }
+    h1, h2 { margin:.2rem 0 1rem; }
+    input, textarea, button, select { width:100%; padding:.7rem; border-radius:10px; border:1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.05); color:var(--text); margin:.3rem 0; }
+    button { cursor:pointer; font-weight:600; }
+    .btn-danger { background: var(--danger); color:#fff; border:none; }
+    .stars { display:flex; gap:.25rem; }
+    .star { cursor:pointer; font-size:1.4rem; color:#666; }
+    .star.active { color:#ffd267; }
+    .list { display:grid; gap:.8rem; }
+    .rank-item { display:flex; align-items:flex-start; gap:.8rem; padding:.6rem; border-radius:12px; background: rgba(255,255,255,.05); }
+    .meta { font-size:.9rem; color:var(--muted); }
   </style>
 </head>
 <body>
   <header>
-    <h1>🏖️ Vote Familial pour les Destinations</h1>
+    <nav>
+      <a href="#home" class="tab active" data-tab="home">🏠 Maison</a>
+      <a href="#profile" class="tab" data-tab="profile">👤 Profil</a>
+      <a href="#ranking" class="tab" data-tab="ranking">🏆 Classement</a>
+    </nav>
   </header>
   <main>
-    <section id="propositions">
-      <h2>Propositions de voyages</h2>
-      <div id="prop-list"></div>
-      <input type="text" id="prop-destination" placeholder="Destination (max 2 par membre)" />
-      <textarea id="prop-argument" placeholder="Arguments" rows="3"></textarea>
-      <button id="addPropBtn" class="btn primary">➕ Ajouter</button>
+    <section id="home" class="section active">
+      <div class="card">
+        <h1>Bienvenue 👋</h1>
+        <p>Choisis ton membre actif ou ajoute ton prénom pour participer.</p>
+        <label>Prénom</label>
+        <input id="memberName" placeholder="ex: Léa" />
+        <button id="addMember">Ajouter</button>
+        <label>Changer de membre actif</label>
+        <select id="activeMember"></select>
+        <button id="btnSwitch">Utiliser ce membre</button>
+      </div>
+      <div class="card">
+        <h2>Membres existants</h2>
+        <div id="memberList" class="list"></div>
+      </div>
     </section>
 
-    <section id="votes">
-      <h2>Noter les destinations</h2>
-      <div id="vote-list"></div>
-      <button id="submitVotesBtn" class="btn primary">✅ Soumettre mes votes</button>
+    <section id="profile" class="section">
+      <div class="card">
+        <h2>Proposer une destination (max 2)</h2>
+        <input id="proposalTitle" placeholder="Destination" />
+        <textarea id="proposalArgs" placeholder="Arguments"></textarea>
+        <button id="addProposal">Ajouter</button>
+      </div>
+      <div class="card">
+        <h2>Propositions</h2>
+        <div id="proposalList" class="list"></div>
+      </div>
     </section>
 
-    <section id="classement">
-      <h2>Classement</h2>
-      <div id="ranking"></div>
+    <section id="ranking" class="section">
+      <div class="card">
+        <h2>Classement</h2>
+        <div id="results"></div>
+      </div>
     </section>
   </main>
 
-  <footer>
-    🌐 Site familial – Propositions et votes en temps réel avec Firebase
-  </footer>
-
-  <div style="position:fixed;bottom:1rem;right:1rem;">
-    <button id="downloadBtn" class="btn primary">📥 Télécharger</button>
-  </div>
-
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, remove, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDpeCfu5oP_PsYJrcSHswo57A7DoLsaCkk",
       authDomain: "voyage-famille-2k26.firebaseapp.com",
-      databaseURL: "https://voyage-famille-2k26-default-rtdb.europe-west1.firebasedatabase.app/",
+      databaseURL: "https://voyage-famille-2k26-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "voyage-famille-2k26",
-      storageBucket: "voyage-famille-2k26.firebasestorage.app",
+      storageBucket: "voyage-famille-2k26.appspot.com",
       messagingSenderId: "536799085283",
       appId: "1:536799085283:web:20cf70df19ebb3d201bbd6"
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const propList = document.getElementById('prop-list');
-    const voteList = document.getElementById('vote-list');
-    const rankingDiv = document.getElementById('ranking');
+    const $ = id => document.getElementById(id);
+    const sections = { home: $("home"), profile: $("profile"), ranking: $("ranking") };
+    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+      sections[t.dataset.tab].classList.add('active');
+      document.querySelectorAll('.tab').forEach(tt=>tt.classList.remove('active'));
+      t.classList.add('active');
+    }));
 
-    const addPropBtn = document.getElementById('addPropBtn');
-    const submitVotesBtn = document.getElementById('submitVotesBtn');
-
-    let localVotes = {};
-
-    function renderStars(destId) {
-      let starsHtml = '';
-      for (let i = 1; i <= 5; i++) {
-        starsHtml += `<span class="star" data-dest="${destId}" data-val="${i}">★</span>`;
-      }
-      return starsHtml;
+    let currentMember = localStorage.getItem('currentMember')||'';
+    function refreshMembers(members){
+      $("memberList").innerHTML='';
+      $("activeMember").innerHTML='<option value="">—</option>';
+      Object.keys(members).forEach(m=>{
+        const div=document.createElement('div');div.textContent=m;div.className='meta';$("memberList").appendChild(div);
+        const opt=document.createElement('option');opt.value=m;opt.textContent=m;$("activeMember").appendChild(opt);
+      });
+      if(currentMember) $("activeMember").value=currentMember;
     }
 
-    // Ajouter une proposition
-    addPropBtn.addEventListener('click', () => {
-      const dest = document.getElementById('prop-destination').value.trim();
-      const arg = document.getElementById('prop-argument').value.trim();
-      if (!dest) return;
-      const newRef = push(ref(db, 'propositions'));
-      set(newRef, { destination: dest, argument: arg });
-      document.getElementById('prop-destination').value = '';
-      document.getElementById('prop-argument').value = '';
+    $("addMember").addEventListener('click', async()=>{
+      const name=$("memberName").value.trim();
+      if(!name) return;
+      await set(ref(db,'members/'+name),true);
+      localStorage.setItem('currentMember',name);
+      currentMember=name;
+      $("memberName").value='';
+    });
+    $("btnSwitch").addEventListener('click',()=>{
+      const sel=$("activeMember");
+      if(!sel.value) return;
+      currentMember=sel.value;localStorage.setItem('currentMember',currentMember);
+    });
+    onValue(ref(db,'members'),snap=>refreshMembers(snap.val()||{}));
+
+    $("addProposal").addEventListener('click',async()=>{
+      if(!currentMember) return alert("Choisis un membre d'abord");
+      const title=$("proposalTitle").value.trim();
+      const args=$("proposalArgs").value.trim();
+      if(!title||!args) return;
+      const snap=await get(ref(db,'proposals'));
+      const all=snap.val()||{};
+      if(Object.values(all).filter(p=>p.author===currentMember).length>=2) return alert("Max 2 propositions");
+      const idRef=push(ref(db,'proposals'));
+      await set(idRef,{id:idRef.key,title,args,author:currentMember});
+      $("proposalTitle").value='';
+      $("proposalArgs").value='';
     });
 
-    // Supprimer une proposition
-    function deleteProp(id) {
-      remove(ref(db, 'propositions/' + id));
-      remove(ref(db, 'votes/' + id));
-    }
-
-    // Afficher les propositions + votes
-    onValue(ref(db, 'propositions'), snapshot => {
-      propList.innerHTML = '';
-      voteList.innerHTML = '';
-      const data = snapshot.val();
-      if (!data) return;
-      Object.entries(data).forEach(([id, prop]) => {
-        // Carte proposition
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.innerHTML = `<strong>${prop.destination}</strong><br><em>${prop.argument}</em><br>` +
-                        `<button class="btn danger" onclick="deleteProp('${id}')">🗑️ Supprimer</button>`;
-        propList.appendChild(div);
-
-        // Carte vote
-        const voteDiv = document.createElement('div');
-        voteDiv.className = 'card';
-        voteDiv.innerHTML = `<strong>${prop.destination}</strong><div>${renderStars(id)}</div>` +
-                            `<button class="btn danger" onclick="deleteVote('${id}')">❌ Effacer mon vote</button>`;
-        voteList.appendChild(voteDiv);
-      });
-      initStarListeners();
-    });
-
-    // Gestion des votes en local
-    function initStarListeners() {
-      document.querySelectorAll('.star').forEach(star => {
-        star.addEventListener('click', () => {
-          const dest = star.dataset.dest;
-          const val = parseInt(star.dataset.val);
-          localVotes[dest] = val;
-          document.querySelectorAll(`.star[data-dest='${dest}']`).forEach(s => s.classList.remove('selected'));
-          for (let i = 1; i <= val; i++) {
-            document.querySelector(`.star[data-dest='${dest}'][data-val='${i}']`).classList.add('selected');
-          }
-        });
+    function renderProposals(list){
+      $("proposalList").innerHTML='';
+      Object.values(list||{}).forEach(p=>{
+        const item=document.createElement('div');item.className='card';
+        item.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>${p.args}</span><div class='stars'></div><button class='btn-danger'>Supprimer</button>`;
+        const stars=item.querySelector('.stars');
+        for(let i=1;i<=5;i++){
+          const s=document.createElement('span');s.textContent='★';s.className='star';
+          s.onclick=()=>set(ref(db,'ratings/'+p.id+'/'+currentMember),i);
+          onValue(ref(db,'ratings/'+p.id+'/'+currentMember),snap=>{s.classList.toggle('active',(snap.val()||0)>=i)});
+          stars.appendChild(s);
+        }
+        item.querySelector('.btn-danger').onclick=()=>{remove(ref(db,'proposals/'+p.id));remove(ref(db,'ratings/'+p.id));};
+        $("proposalList").appendChild(item);
       });
     }
+    onValue(ref(db,'proposals'),snap=>renderProposals(snap.val()));
 
-    // Soumettre votes
-    submitVotesBtn.addEventListener('click', () => {
-      Object.entries(localVotes).forEach(([dest, val]) => {
-        set(ref(db, 'votes/' + dest + "/" + Date.now()), val);
-      });
-      localVotes = {};
-      alert('✅ Votes soumis !');
-    });
-
-    // Supprimer son vote
-    window.deleteVote = (destId) => {
-      remove(ref(db, 'votes/' + destId));
+    async function refreshRanking(){
+      const props=(await get(ref(db,'proposals'))).val()||{};
+      const box=$("results"); box.innerHTML='';
+      await Promise.all(Object.values(props).map(async p=>{
+        const r=(await get(ref(db,'ratings/'+p.id))).val()||{};
+        const arr=Object.values(r);
+        const avg=arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
+        const div=document.createElement('div');div.className='rank-item';
+        div.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>Moyenne ${avg.toFixed(2)}⭐ (${arr.length} votes)</span><br><span>${p.args}</span>`;
+        box.appendChild(div);
+      }));
     }
-
-    // Classement avec noms au lieu d'ID
-    onValue(ref(db, 'votes'), async snapshot => {
-      const votes = snapshot.val();
-      if (!votes) { rankingDiv.innerHTML = 'Pas encore de votes.'; return; }
-
-      const scores = {};
-      for (const [destId, allVotes] of Object.entries(votes)) {
-        const vals = Object.values(allVotes);
-        const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
-        // Récupérer le nom de la destination
-        const propSnap = await get(ref(db, 'propositions/' + destId));
-        const name = propSnap.exists() ? propSnap.val().destination : destId;
-        scores[name] = avg;
-      }
-
-      let html = '';
-      Object.entries(scores).sort((a,b)=>b[1]-a[1]).forEach(([name, avg]) => {
-        html += `<div class='card'><strong>${name}</strong> <span>${avg.toFixed(2)} ⭐</span></div>`;
-      });
-      rankingDiv.innerHTML = html;
-    });
-
-    window.deleteProp = deleteProp;
-  </script>
-
-  <script>
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'vote_familial.html';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    onValue(ref(db,'ratings'),()=>refreshRanking());
   </script>
 </body>
 </html>
