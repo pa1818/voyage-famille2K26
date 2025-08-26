@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vote Familial – Destinations</title>
+  <style>
+    /* Design épuré et futuriste qui marchait au début, avec correctifs */
+    :root {
+      --bg: #0b1020;
+      --card: #121933;
+      --muted: #8ea0ff;
+      --accent: #6ea8ff;
+      --text: #e8ecff;
+      --danger: #ff6b6b;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    body { margin:0; font-family: Segoe UI, Inter, sans-serif; background: var(--bg); color: var(--text); }
+    header { background: rgba(18,25,51,.8); backdrop-filter: blur(6px); padding:1rem; position:sticky; top:0; z-index:10; }
+    nav { display:flex; gap:.5rem; justify-content:center; }
+    .tab { padding:.5rem 1rem; border-radius: 999px; border:1px solid rgba(255,255,255,.15); color: var(--muted); text-decoration:none; }
+    .tab.active { background: linear-gradient(135deg, #3f64ff, #6aa6ff); color:#04122e; border-color:transparent; }
+    main { max-width:950px; margin: auto; padding: 1.5rem; }
+    .card { background: var(--card); border:1px solid rgba(255,255,255,.08); border-radius: var(--radius); box-shadow: var(--shadow); padding:1rem; margin-bottom:1rem; }
+    h1, h2 { margin:.2rem 0 1rem; }
+    input, textarea, button, select { width:100%; padding:.7rem; border-radius:10px; border:1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.05); color:var(--text); margin:.3rem 0; }
+    button { cursor:pointer; font-weight:600; }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+    .btn-danger { background: var(--danger); color:#fff; border:none; }
+    .stars { display:flex; gap:.25rem; margin:.35rem 0; }
+    .star { cursor:pointer; font-size:1.4rem; color:#666; }
+    .star.active { color:#ffd267; }
+    .list { display:grid; gap:.8rem; }
+    .rank-item { display:flex; flex-direction:column; gap:.25rem; padding:.6rem; border-radius:12px; background: rgba(255,255,255,.05); }
+    .meta { font-size:.9rem; color:var(--muted); }
+
+    /* ✅ Correctif navigation: montrer uniquement l'onglet actif */
+    .section{ display:none; }
+    .section.active{ display:block; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="#home" class="tab active" data-tab="home">🏠 Maison</a>
+      <a href="#profile" class="tab" data-tab="profile">👤 Profil</a>
+      <a href="#ranking" class="tab" data-tab="ranking">🏆 Classement</a>
+    </nav>
+  </header>
+  <main>
+    <section id="home" class="section active">
+      <div class="card">
+        <h1>Bienvenue 👋</h1>
+        <p>Choisis ton membre actif ou ajoute ton prénom pour participer.</p>
+        <label>Prénom</label>
+        <input id="memberName" placeholder="ex: Léa" />
+        <button id="addMember">Ajouter</button>
+        <label>Changer de membre actif</label>
+        <select id="activeMember"></select>
+        <button id="btnSwitch">Utiliser ce membre</button>
+      </div>
+      <div class="card">
+        <h2>Membres existants</h2>
+        <div id="memberList" class="list"></div>
+      </div>
+    </section>
+
+    <section id="profile" class="section">
+      <div class="card">
+        <h2>Proposer une destination (max 2)</h2>
+        <input id="proposalTitle" placeholder="Destination" />
+        <textarea id="proposalArgs" placeholder="Arguments"></textarea>
+        <button id="addProposal">Ajouter</button>
+      </div>
+      <div class="card">
+        <h2>Propositions</h2>
+        <div id="proposalList" class="list"></div>
+      </div>
+    </section>
+
+    <section id="ranking" class="section">
+      <div class="card">
+        <h2>Classement</h2>
+        <div id="results"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, push, remove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDpeCfu5oP_PsYJrcSHswo57A7DoLsaCkk",
+      authDomain: "voyage-famille-2k26.firebaseapp.com",
+      databaseURL: "https://voyage-famille-2k26-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "voyage-famille-2k26",
+      storageBucket: "voyage-famille-2k26.appspot.com",
+      messagingSenderId: "536799085283",
+      appId: "1:536799085283:web:20cf70df19ebb3d201bbd6"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // ===== NAVIGATION (retour au comportement du début + hash) =====
+    const sections = { home: document.getElementById("home"), profile: document.getElementById("profile"), ranking: document.getElementById("ranking") };
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+
+    function setActive(tabName){
+      Object.values(sections).forEach(s=>s.classList.remove('active'));
+      sections[tabName]?.classList.add('active');
+      tabs.forEach(t=>t.classList.toggle('active', t.dataset.tab===tabName));
+    }
+
+    tabs.forEach(a=>a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const tab=a.dataset.tab; 
+      location.hash = tab; // garde l'URL propre
+      setActive(tab);
+    }));
+
+    window.addEventListener('hashchange', ()=>{
+      const tab=(location.hash.replace('#','')||'home');
+      setActive(tab);
+    });
+    // init
+    setActive((location.hash.replace('#','')||'home'));
+
+    // ===== APP =====
+    let currentMember = localStorage.getItem('currentMember')||'';
+    const $ = id => document.getElementById(id);
+
+    function refreshMembers(members){
+      $("memberList").innerHTML='';
+      $("activeMember").innerHTML='<option value="">—</option>';
+      Object.keys(members).forEach(m=>{
+        const div=document.createElement('div');div.textContent=m;div.className='meta';$("memberList").appendChild(div);
+        const opt=document.createElement('option');opt.value=m;opt.textContent=m;$("activeMember").appendChild(opt);
+      });
+      if(currentMember) $("activeMember").value=currentMember;
+    }
+
+    $("addMember").addEventListener('click', async()=>{
+      const name=$("memberName").value.trim();
+      if(!name) return;
+      await set(ref(db,'members/'+name),true);
+      localStorage.setItem('currentMember',name);
+      currentMember=name;
+      $("memberName").value='';
+    });
+    $("btnSwitch").addEventListener('click',()=>{
+      const sel=$("activeMember");
+      if(!sel.value) return;
+      currentMember=sel.value;localStorage.setItem('currentMember',currentMember);
+    });
+    onValue(ref(db,'members'),snap=>refreshMembers(snap.val()||{}));
+
+    $("addProposal").addEventListener('click',async()=>{
+      if(!currentMember) return alert("Choisis un membre d'abord");
+      const title=$("proposalTitle").value.trim();
+      const args=$("proposalArgs").value.trim();
+      if(!title||!args) return;
+      const snap=await get(ref(db,'proposals'));
+      const all=snap.val()||{};
+      if(Object.values(all).filter(p=>p.author===currentMember).length>=2) return alert("Max 2 propositions");
+      const idRef=push(ref(db,'proposals'));
+      await set(idRef,{id:idRef.key,title,args,author:currentMember});
+      $("proposalTitle").value='';
+      $("proposalArgs").value='';
+    });
+
+    function renderProposals(list){
+      $("proposalList").innerHTML='';
+      Object.values(list||{}).forEach(p=>{
+        const item=document.createElement('div');item.className='card';
+        // Corps
+        const head=document.createElement('div');
+        head.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>${p.args}</span>`;
+        item.appendChild(head);
+
+        // Étoiles de vote
+        const stars=document.createElement('div'); stars.className='stars';
+        for(let i=1;i<=5;i++){
+          const s=document.createElement('span'); s.textContent='★'; s.className='star';
+          s.onclick=()=>{ if(!currentMember) return alert("Choisis un membre d'abord"); set(ref(db,'ratings/'+p.id+'/'+currentMember),i); };
+          onValue(ref(db,'ratings/'+p.id+'/'+currentMember),snap=>{ s.classList.toggle('active',(snap.val()||0)>=i); });
+          stars.appendChild(s);
+        }
+        item.appendChild(stars);
+
+        // Boutons actions
+        const actions=document.createElement('div');
+        // Effacer mon vote (seulement le mien)
+        const clearVoteBtn=document.createElement('button');
+        clearVoteBtn.textContent='Effacer mon vote';
+        clearVoteBtn.className='btn-danger';
+        clearVoteBtn.onclick=()=>{ if(!currentMember) return alert('Choisis un membre'); remove(ref(db,'ratings/'+p.id+'/'+currentMember)); };
+        // Activer/désactiver selon existence du vote
+        onValue(ref(db,'ratings/'+p.id+'/'+currentMember), snap=>{ clearVoteBtn.disabled = !snap.exists(); });
+        actions.appendChild(clearVoteBtn);
+
+        // Supprimer MA proposition (pas celle des autres)
+        if(p.author===currentMember){
+          const delBtn=document.createElement('button');
+          delBtn.textContent='Supprimer ma proposition';
+          delBtn.className='btn-danger';
+          delBtn.onclick=()=>{ remove(ref(db,'proposals/'+p.id)); remove(ref(db,'ratings/'+p.id)); };
+          actions.appendChild(delBtn);
+        }
+        item.appendChild(actions);
+
+        $("proposalList").appendChild(item);
+      });
+    }
+    onValue(ref(db,'proposals'),snap=>{ renderProposals(snap.val()); refreshRanking(); });
+
+    async function refreshRanking(){
+      const props=(await get(ref(db,'proposals'))).val()||{};
+      const box=document.getElementById("results"); box.innerHTML='';
+      await Promise.all(Object.values(props).map(async p=>{
+        const r=(await get(ref(db,'ratings/'+p.id))).val()||{};
+        const arr=Object.values(r);
+        const avg=arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
+        const div=document.createElement('div');div.className='rank-item';
+        div.innerHTML=`<b>${p.title}</b> – ${p.author}<span class='meta'>Moyenne ${avg.toFixed(2)}⭐ · ${arr.length} votes</span><span>${p.args}</span>`;
+        box.appendChild(div);
+      }));
+    }
+    onValue(ref(db,'ratings'),()=>refreshRanking());
+  </script>
+</body>
+</html>
