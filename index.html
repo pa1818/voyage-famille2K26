@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vote Familial – Destinations</title>
   <style>
-    /* Design épuré et futuriste */
+    /* Design épuré et futuriste qui marchait au début, avec correctifs */
     :root {
       --bg: #0b1020;
       --card: #121933;
@@ -26,13 +26,18 @@
     h1, h2 { margin:.2rem 0 1rem; }
     input, textarea, button, select { width:100%; padding:.7rem; border-radius:10px; border:1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.05); color:var(--text); margin:.3rem 0; }
     button { cursor:pointer; font-weight:600; }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
     .btn-danger { background: var(--danger); color:#fff; border:none; }
-    .stars { display:flex; gap:.25rem; }
+    .stars { display:flex; gap:.25rem; margin:.35rem 0; }
     .star { cursor:pointer; font-size:1.4rem; color:#666; }
     .star.active { color:#ffd267; }
     .list { display:grid; gap:.8rem; }
-    .rank-item { display:flex; align-items:flex-start; gap:.8rem; padding:.6rem; border-radius:12px; background: rgba(255,255,255,.05); }
+    .rank-item { display:flex; flex-direction:column; gap:.25rem; padding:.6rem; border-radius:12px; background: rgba(255,255,255,.05); }
     .meta { font-size:.9rem; color:var(--muted); }
+
+    /* ✅ Correctif navigation: montrer uniquement l'onglet actif */
+    .section{ display:none; }
+    .section.active{ display:block; }
   </style>
 </head>
 <body>
@@ -98,17 +103,34 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const $ = id => document.getElementById(id);
-    const sections = { home: $("home"), profile: $("profile"), ranking: $("ranking") };
-    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', e => {
+    // ===== NAVIGATION (retour au comportement du début + hash) =====
+    const sections = { home: document.getElementById("home"), profile: document.getElementById("profile"), ranking: document.getElementById("ranking") };
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+
+    function setActive(tabName){
+      Object.values(sections).forEach(s=>s.classList.remove('active'));
+      sections[tabName]?.classList.add('active');
+      tabs.forEach(t=>t.classList.toggle('active', t.dataset.tab===tabName));
+    }
+
+    tabs.forEach(a=>a.addEventListener('click', (e)=>{
       e.preventDefault();
-      document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-      sections[t.dataset.tab].classList.add('active');
-      document.querySelectorAll('.tab').forEach(tt=>tt.classList.remove('active'));
-      t.classList.add('active');
+      const tab=a.dataset.tab; 
+      location.hash = tab; // garde l'URL propre
+      setActive(tab);
     }));
 
+    window.addEventListener('hashchange', ()=>{
+      const tab=(location.hash.replace('#','')||'home');
+      setActive(tab);
+    });
+    // init
+    setActive((location.hash.replace('#','')||'home'));
+
+    // ===== APP =====
     let currentMember = localStorage.getItem('currentMember')||'';
+    const $ = id => document.getElementById(id);
+
     function refreshMembers(members){
       $("memberList").innerHTML='';
       $("activeMember").innerHTML='<option value="">—</option>';
@@ -152,29 +174,56 @@
       $("proposalList").innerHTML='';
       Object.values(list||{}).forEach(p=>{
         const item=document.createElement('div');item.className='card';
-        item.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>${p.args}</span><div class='stars'></div><button class='btn-danger'>Supprimer</button>`;
-        const stars=item.querySelector('.stars');
+        // Corps
+        const head=document.createElement('div');
+        head.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>${p.args}</span>`;
+        item.appendChild(head);
+
+        // Étoiles de vote
+        const stars=document.createElement('div'); stars.className='stars';
         for(let i=1;i<=5;i++){
-          const s=document.createElement('span');s.textContent='★';s.className='star';
-          s.onclick=()=>set(ref(db,'ratings/'+p.id+'/'+currentMember),i);
-          onValue(ref(db,'ratings/'+p.id+'/'+currentMember),snap=>{s.classList.toggle('active',(snap.val()||0)>=i)});
+          const s=document.createElement('span'); s.textContent='★'; s.className='star';
+          s.onclick=()=>{ if(!currentMember) return alert("Choisis un membre d'abord"); set(ref(db,'ratings/'+p.id+'/'+currentMember),i); };
+          onValue(ref(db,'ratings/'+p.id+'/'+currentMember),snap=>{ s.classList.toggle('active',(snap.val()||0)>=i); });
           stars.appendChild(s);
         }
-        item.querySelector('.btn-danger').onclick=()=>{remove(ref(db,'proposals/'+p.id));remove(ref(db,'ratings/'+p.id));};
+        item.appendChild(stars);
+
+        // Boutons actions
+        const actions=document.createElement('div');
+        // Effacer mon vote (seulement le mien)
+        const clearVoteBtn=document.createElement('button');
+        clearVoteBtn.textContent='Effacer mon vote';
+        clearVoteBtn.className='btn-danger';
+        clearVoteBtn.onclick=()=>{ if(!currentMember) return alert('Choisis un membre'); remove(ref(db,'ratings/'+p.id+'/'+currentMember)); };
+        // Activer/désactiver selon existence du vote
+        onValue(ref(db,'ratings/'+p.id+'/'+currentMember), snap=>{ clearVoteBtn.disabled = !snap.exists(); });
+        actions.appendChild(clearVoteBtn);
+
+        // Supprimer MA proposition (pas celle des autres)
+        if(p.author===currentMember){
+          const delBtn=document.createElement('button');
+          delBtn.textContent='Supprimer ma proposition';
+          delBtn.className='btn-danger';
+          delBtn.onclick=()=>{ remove(ref(db,'proposals/'+p.id)); remove(ref(db,'ratings/'+p.id)); };
+          actions.appendChild(delBtn);
+        }
+        item.appendChild(actions);
+
         $("proposalList").appendChild(item);
       });
     }
-    onValue(ref(db,'proposals'),snap=>renderProposals(snap.val()));
+    onValue(ref(db,'proposals'),snap=>{ renderProposals(snap.val()); refreshRanking(); });
 
     async function refreshRanking(){
       const props=(await get(ref(db,'proposals'))).val()||{};
-      const box=$("results"); box.innerHTML='';
+      const box=document.getElementById("results"); box.innerHTML='';
       await Promise.all(Object.values(props).map(async p=>{
         const r=(await get(ref(db,'ratings/'+p.id))).val()||{};
         const arr=Object.values(r);
         const avg=arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
         const div=document.createElement('div');div.className='rank-item';
-        div.innerHTML=`<b>${p.title}</b> – ${p.author}<br><span class='meta'>Moyenne ${avg.toFixed(2)}⭐ (${arr.length} votes)</span><br><span>${p.args}</span>`;
+        div.innerHTML=`<b>${p.title}</b> – ${p.author}<span class='meta'>Moyenne ${avg.toFixed(2)}⭐ · ${arr.length} votes</span><span>${p.args}</span>`;
         box.appendChild(div);
       }));
     }
